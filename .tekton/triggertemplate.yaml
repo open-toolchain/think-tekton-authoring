@@ -8,17 +8,7 @@ spec:
     description: The event header
   - name: body
     description: The event body
-  - name: dockerconfigjson_base64
-    description: Base64 encoded dockerconfigjson. Default value is `echo '{"auths":{}}' | base64`.
-    default: eyJhdXRocyI6e319Cg==
   resourcetemplates:
-  - apiVersion: v1
-    kind: Secret
-    type: kubernetes.io/dockerconfigjson
-    metadata:
-      name: pipeline-pullsecret
-    data:
-      .dockerconfigjson: $(tt.params.dockerconfigjson_base64)
   - apiVersion: tekton.dev/v1beta1
     kind: PipelineRun
     metadata:
@@ -31,11 +21,4 @@ spec:
         value: $(tt.params.header)
       - name: body
         value: $(tt.params.body)
-      podTemplate:
-        imagePullSecrets:
-        - name: pipeline-pullsecret
-      workspaces:
-          - name: pipeline-ws
-            persistentVolumeClaim:
-              claimName: pipelinerun-pvc
 
