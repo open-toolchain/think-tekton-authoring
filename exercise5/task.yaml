@@ -80,11 +80,11 @@ spec:
       docker images
       cp /workspace/pipeline/.bluemix/config.json ~/.bluemix/config.json
 
-      docker build -t us.icr.io/skaegi/hello-world .
+      docker build -t $image_repo/hello-world .
       docker images
 
       ic cr login
-      docker push us.icr.io/skaegi/hello-world
+      docker push $image_repo/hello-world
 
     volumeMounts:
     - name: properties

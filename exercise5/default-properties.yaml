@@ -5,3 +5,4 @@ metadata:
 data:
   apikey: CHANGEME
   repository: CHANGEME
+  image_repo: CHANGEME
