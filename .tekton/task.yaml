@@ -9,8 +9,6 @@ spec:
     - name: body
       description: The event body
   steps:
-  - name: hello-world
-    image: hello-world:latest
   - name: print-event
     env:
       - name: HEADER
