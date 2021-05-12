@@ -1,0 +1,24 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: trigger-template
+spec:
+  params:
+  - name: header
+    description: The event header
+  - name: body
+    description: The event body
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: pipelinerun-
+    spec:
+      pipelineRef:
+        name: pipeline
+      params:
+      - name: header
+        value: $(tt.params.header)
+      - name: body
+        value: $(tt.params.body)
+

@@ -1,0 +1,12 @@
+
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: trigger-binding
+spec:
+  params:
+  - name: header
+    value: $(header)
+  - name: body
+    value: $(body)
+

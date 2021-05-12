@@ -1,0 +1,104 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task
+spec:
+  params:
+    - name: header
+      description: The event header
+    - name: body
+      description: The event body
+  workspaces:
+  - name: pipeline
+  steps:
+  - name: print-event
+    env:
+      - name: HEADER
+        value: $(params.header)
+      - name: BODY
+        value: $(params.body)
+    image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.0
+    script: |
+      #!/usr/bin/env bash
+      set -e 
+      ibmcloud config --check-version false;
+      ibmcloud login --no-region --apikey $(cat /workspace/properties/apikey);
+      mkdir -p /workspace/pipeline/.bluemix && cp ~/.bluemix/config.json /workspace/pipeline/.bluemix/config.json
+    volumeMounts:
+    - name: properties
+      mountPath: "/workspace/properties"
+    - name: toolchain
+      mountPath: "/workspace/toolchain.json"
+      subPath: toolchain.json
+    - name: scripts
+      mountPath: "/workspace/scripts"
+  volumes:
+  - name: properties
+    projected:
+      sources:
+      - configMap:
+          name: default-properties
+          optional: true
+      - configMap:
+          name: environment-properties
+          optional: true
+      - secret:
+          name: secure-properties
+          optional: true
+  - name: toolchain
+    configMap:
+      name: toolchain
+  - name: scripts
+    configMap:
+      name: scripts
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task2
+spec:
+  workspaces:
+  - name: pipeline
+  steps:
+  - name: clone-repository
+    image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.0
+    script: |
+      #!/usr/bin/env bash
+
+      echo "Copy .bluemix/config.json to HOME"
+      cp /workspace/pipeline/.bluemix/config.json ~/.bluemix/config.json
+
+      cd ~
+      repository=$(cat /workspace/properties/repository)
+      . /workspace/scripts/git-auth.sh $repository
+      git clone $repository
+      cd $(basename $repository .git)
+      ls -al
+    volumeMounts:
+    - name: properties
+      mountPath: "/workspace/properties"
+    - name: toolchain
+      mountPath: "/workspace/toolchain.json"
+      subPath: toolchain.json
+    - name: scripts
+      mountPath: "/workspace/scripts"
+  volumes:
+  - name: properties
+    projected:
+      sources:
+      - configMap:
+          name: default-properties
+          optional: true
+      - configMap:
+          name: environment-properties
+          optional: true
+      - secret:
+          name: secure-properties
+          optional: true
+  - name: toolchain
+    configMap:
+      name: toolchain
+  - name: scripts
+    configMap:
+      name: scripts
+      

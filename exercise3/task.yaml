@@ -1,0 +1,71 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task
+spec:
+  params:
+    - name: header
+      description: The event header
+    - name: body
+      description: The event body
+  workspaces:
+  - name: pipeline
+  steps:
+  - name: print-event
+    env:
+      - name: HEADER
+        value: $(params.header)
+      - name: BODY
+        value: $(params.body)
+    image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.0
+    script: |
+      #!/usr/bin/env bash
+      set -e
+
+      ls -al /workspace/properties;
+      printf "apikey: " && cat /workspace/properties/apikey && echo
+  
+      ls -al /workspace/pipeline;
+
+      ibmcloud config --check-version false;
+      ibmcloud login --no-region --apikey $(cat /workspace/properties/apikey);
+      mkdir -p /workspace/pipeline/.bluemix && cp ~/.bluemix/config.json /workspace/pipeline/.bluemix/config.json
+
+      ls -al /workspace/pipeline;
+    volumeMounts:
+    - name: properties
+      mountPath: "/workspace/properties"
+    - name: toolchain
+      mountPath: "/workspace/toolchain.json"
+      subPath: toolchain.json
+  volumes:
+  - name: properties
+    projected:
+      sources:
+      - configMap:
+          name: default-properties
+          optional: true
+      - configMap:
+          name: environment-properties
+          optional: true
+      - secret:
+          name: secure-properties
+          optional: true
+  - name: toolchain
+    configMap:
+      name: toolchain
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task2
+spec:
+  workspaces:
+  - name: pipeline
+  steps:
+  - name: show-workspace
+    image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.0
+    script: |
+      #!/usr/bin/env bash
+      set -e
+      ls -al /workspace/pipeline;

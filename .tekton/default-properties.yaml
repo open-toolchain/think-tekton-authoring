@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-properties
+data:
+  apikey: CHANGEME
+  repository: CHANGEME

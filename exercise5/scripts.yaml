@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts
+data:
+  git-auth.sh: |
+    #!/bin/sh
+    set -e -o pipefail
+    
+    if [ -z "$1" ]; then
+      echo "No repository argument provided"
+      exit 1
+    fi
+
+    REPOSITORY=$1
+    if [[ "$REPOSITORY" != *.git ]]; then
+      REPOSITORY="${REPOSITORY}.git"
+    fi
+
+    TOOLCHAIN_JSON=/workspace/toolchain.json
+    if [ ! -f /workspace/toolchain.json ]; then
+      echo "$TOOLCHAIN_JSON not found"
+      exit 1
+    fi
+
+    TOOLCHAIN_ID=$(jq -r '.toolchain_guid' $TOOLCHAIN_JSON)
+    GIT_SERVICE_INSTANCE_ID=$(jq -r --arg git_repo "$REPOSITORY" \
+      '.services[] | select (.parameters.repo_url==$git_repo) | .instance_id' $TOOLCHAIN_JSON)
+    if [ -z "$GIT_SERVICE_INSTANCE_ID" ]; then
+      echo "No Git integration (repository url: $REPOSITORY) found in the toolchain"
+      exit 1
+    fi
+    GIT_SERVICE_TYPE=$(jq -r --arg git_repo "$REPOSITORY" \
+      '.services[] | select (.parameters.repo_url==$git_repo) | .service_id' $TOOLCHAIN_JSON)
+    if [ "$GIT_SERVICE_TYPE" == "github" ]; then
+      GIT_AUTH_USER="x-oauth-basic"
+    elif [ "$GIT_SERVICE_TYPE" == "githubpublic" ]; then
+      GIT_AUTH_USER="x-oauth-basic"
+    elif [ "$GIT_SERVICE_TYPE" == "hostedgit" ]; then
+      GIT_AUTH_USER="oauth2"
+    elif [ "$GIT_SERVICE_TYPE" == "gitlab" ]; then
+      GIT_AUTH_USER="oauth2"
+    elif [ "$GIT_SERVICE_TYPE" == "bitbucketgit" ]; then
+      GIT_AUTH_USER="x-token-auth"
+    else
+      GIT_AUTH_USER="x-token-auth"
+    fi;
+
+    GIT_TOKEN_URL=$(jq -r --arg git_repo "$REPOSITORY" \
+      '.services[] | select (.parameters.repo_url==$git_repo) | .parameters.token_url' \
+      $TOOLCHAIN_JSON)
+    # GIT_TOKEN_URL is something like
+    # https://otc-github-consolidated-broker.us-south.devops.cloud.ibm.com/github/token?git_id=github
+    # as there is already an url param git_id, just put the additional ones using &
+    GIT_BROKER_URL="${GIT_TOKEN_URL}&toolchain_id=${TOOLCHAIN_ID}&service_instance_id=${GIT_SERVICE_INSTANCE_ID}&repo_url=${REPOSITORY}"
+    
+    TOKEN=$(ibmcloud iam oauth-tokens --output JSON | jq -r '.iam_token')
+
+    curl -s -o /workspace/github_token_result.json -X GET -H "Accept: application/json" \
+      -H "Authorization: $TOKEN" "$GIT_BROKER_URL"
+    if jq -e '.access_token' /workspace/github_token_result.json > /dev/null 2>&1; then
+      GIT_TOKEN=$(jq -r '.access_token' /workspace/github_token_result.json)
+      echo "Access token found for the Git integration (repository url: $REPOSITORY)"
+    else
+      echo "No access token found for the Git integration (repository url: $REPOSITORY)"
+      cat /workspace/github_token_result.json
+      exit 1
+    fi
+
+    git config --global credential.helper store
+    printf "url=$REPOSITORY\nusername=$GIT_AUTH_USER\npassword=$GIT_TOKEN" | git credential-store store
+  dockerd-entrypoint.sh: |
+    #!/bin/sh
+    set -e -o pipefail
+    
+    # Set the MTU to a value that is containable in the ibmcloud calico mtu value
+    # Use block storage instead of virtio-fs for Continuous Delivery shared workers
+    if [[ $(df -PT /var/lib/docker | awk 'NR==2 {print $2}') == virtiofs ]]; then
+      apk add e2fsprogs &&
+      truncate -s 20G /tmp/disk.img &&
+      mkfs.ext4 /tmp/disk.img &&
+      mount /tmp/disk.img /var/lib/docker; fi &&
+    dockerd-entrypoint.sh --mtu=1400;
