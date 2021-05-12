@@ -80,6 +80,8 @@ spec:
       docker images
       cp /workspace/pipeline/.bluemix/config.json ~/.bluemix/config.json
 
+      image_repo=$(cat /workspace/properties/image_repo)
+
       docker build -t $image_repo/hello-world .
       docker images
 
