@@ -103,8 +103,7 @@ spec:
     name: docker-daemon
     securityContext:
       privileged: true
-    scripts: |
-      sh /workspace/scripts/dockerd-entrypoint.sh
+    command: ["sh", "/workspace/scripts/dockerd-entrypoint.sh"]
     volumeMounts:
     - mountPath: /var/run/
       name: docker-socket
